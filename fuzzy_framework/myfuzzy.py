@@ -55,20 +55,23 @@ class Interval():
     
 class Variable():
 
-    def __init__(self):
+    def __init__(self, name: str):
         self.intervals = {}
+        self.name = name
 
     def add_interval(self, name: str, interval: list):
         self.intervals[name] = Interval(interval)
     
     def get_interval(self, arg: float):
+        intervals = {}
         for name, interval in self.intervals.items():
             x1, x2 = interval.get_range()
 
             if x1 <= arg and arg <= x2:
                 value = interval.get_value(arg)
                 if value:
-                    print(name, value)
+                    intervals[name] = value
+        return intervals
     
     def plot(self):
         for name, interval in self.intervals.items():
@@ -81,14 +84,51 @@ class Variable():
             plt.plot(points[:,0], points[:,1], label=name)
 
         plt.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
+        plt.title(self.name)
         plt.tight_layout()
         plt.show()
 
-if __name__ == "__main__":
-    
-    food = Variable()
-    food.add_interval('poor', [0,0,1,2])
-    food.add_interval('good', [1,2,5])
-    food.add_interval('great', [2,5,7,7])
-    food.get_interval(6.9)
-    food.plot()
+class Rule():
+
+    def __init__(self, condition1: tuple, operation: str, condition2: tuple, output: float):
+        self.condition1 = condition1
+        self.condition2 = condition2
+        self.operation = operation
+        self.output = output
+
+class Model():
+
+    def __init__(self, rules: list = []):
+        self.rules = rules
+
+    def predict(self, value1, value2):
+        
+        var_to_avg = []
+        for rule in self.rules:
+            intervals_cond1 = rule.condition1[0].get_interval(value1)
+            intervals_cond2 = rule.condition2[0].get_interval(value2)
+            inerval1_name = rule.condition1[1]
+            inerval2_name = rule.condition2[1]
+
+            if inerval1_name not in intervals_cond1 or inerval2_name not in intervals_cond2:
+                continue
+            
+            arg1 = intervals_cond1[inerval1_name]
+            arg2 = intervals_cond2[inerval2_name]
+
+            if rule.operation == 'AND':
+                var = np.array([arg1,arg2]).min()
+            elif rule.operation == 'OR':
+                var = np.array([arg1,arg2]).max()
+
+            var_to_avg.append([var, rule.output])
+
+        if len(var_to_avg) == 0:
+            raise Exception('Set rules are too sparse')
+
+        var_to_avg = np.array(var_to_avg)
+        multipied = np.prod(var_to_avg, axis=1)
+        sum = np.sum(var_to_avg[:,0])
+        score = np.sum(multipied)/sum
+
+        return score
